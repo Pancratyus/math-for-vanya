@@ -4,7 +4,7 @@
    (ознакомительные заходы статистику не портят). */
 
 import {
-  SECTIONS, buildItems, buildSession, applyAnswer,
+  SECTIONS, buildItems, buildSession, applyAnswer, pickOrientation,
   answerXp, sessionBonus, levelFromXp, updateStreak, todayKey,
   checkAchievements, mastery, isProblem, MAX_REQUEUE,
 } from './engine.js';
@@ -110,7 +110,15 @@ function nextQuestion(first = false) {
   if (s.idx >= s.queue.length) { finishSession(); return; }
   const entry = s.queue[s.idx];
   const item = buildItems(s.section, s.draft.settings.squaresMax).find(it => it.id === entry.id);
-  s.current = item;
+  // направление для умножения: 4×6 или 6×4 — слабую сторону подаём чаще
+  const rev = pickOrientation(item, s.draft.items[item.id]) === 'reverse';
+  let text = item.text;
+  if (rev) {
+    const [, a, b] = item.id.split(':');
+    text = `${b} × ${a}`;
+  }
+  s.current = { ...item, text };
+  s.currentRev = rev;
   s.input = '';
   s.flash = '';
   s.feedback = null;
@@ -141,7 +149,7 @@ function submitAnswer() {
   const today = todayKey();
 
   const st = itemState(d, s.current.id);
-  applyAnswer(st, ok, t);
+  applyAnswer(st, ok, t, s.currentRev);
 
   const day = dayEntry(d, today);
   day.a += 1;
@@ -333,7 +341,14 @@ function showMasteryDetail(id) {
     text = `${item.text} = ${item.answer} · пока не встречался`;
   } else {
     const avg = st.h.reduce((s, r) => s + r.t, 0) / st.h.length;
+    const sides = (rev) => {
+      const arr = st.h.filter(r => !!r.rev === rev);
+      if (!arr.length) return null;
+      return `${arr.filter(r => r.o).length}/${arr.length} верных, среднее ${fmtSec(arr.reduce((s, r) => s + r.t, 0) / arr.length)}`;
+    };
+    const N = sides(false), R = sides(true);
     text = `${item.text} = ${item.answer} · верных ${st.c} из ${st.a} · среднее ${fmtSec(avg)} · освоено ${m < 0 ? 0 : Math.round(m * 100)}%`;
+    if (R) text += ` · прямой: ${N || '—'} · в развороте: ${R}`;
   }
   out.textContent = text;
 }

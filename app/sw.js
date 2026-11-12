@@ -1,7 +1,7 @@
 /* sw.js — офлайн-кэш приложения.
    При изменении файлов приложения увеличь VERSION. */
 
-const VERSION = 'math-vanya-v5';
+const VERSION = 'math-vanya-v6';
 const ASSETS = [
   './',
   './index.html',

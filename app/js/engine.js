@@ -81,13 +81,45 @@ export function isProblem(st, threshold = THRESHOLD_DEFAULT) {
   return false;
 }
 
-/** Записать ответ в состояние примера. time — секунды. */
-export function applyAnswer(st, ok, time) {
-  st.h.unshift({ o: ok ? 1 : 0, t: Math.round(time * 10) / 10 });
+/** Записать ответ в состояние примера. time — секунды, rev — пример был показан в развороте (b×a). */
+export function applyAnswer(st, ok, time, rev = false) {
+  st.h.unshift({ o: ok ? 1 : 0, t: Math.round(time * 10) / 10, rev: rev ? 1 : 0 });
   st.h = st.h.slice(0, 10);
   st.a += 1;
   if (ok) st.c += 1;
   return st;
+}
+
+// ---------- Направление примера (4×6 vs 6×4) ----------
+
+/** Оценка недавних ответов в одном направлении: точность со штрафом за медлительность. */
+function sideScore(st, rev) {
+  const arr = (st && st.h ? st.h : []).filter(r => !!r.rev === rev).slice(0, 4);
+  if (arr.length === 0) return null;
+  const acc = arr.reduce((s, r) => s + r.o, 0) / arr.length;
+  const avgT = arr.reduce((s, r) => s + r.t, 0) / arr.length;
+  return acc - avgT / 20; // 20 сек обнуляют победу быстрых над верными
+}
+
+/**
+ * Какую сторону пары показать: 'normal' (a×b, меньшее первым) или 'reverse' (b×a).
+ * Нет данных — 50/50; есть данные лишь с одной стороны — ту другую подтягиваем
+ * (35%); если одна сторона явно слабее — показываем её в 70% случаев.
+ */
+export function pickOrientation(item, st, rnd = Math.random) {
+  if (item.section !== 'mul') return 'normal';
+  const [, a, b] = item.id.split(':');
+  if (a === b) return 'normal';
+  const N = sideScore(st, false);
+  const R = sideScore(st, true);
+  let weak = null;
+  if (N === null && R === null) weak = null;
+  else if (N === null) weak = 'normal';       // разворот уже знают — подтягиваем прямой
+  else if (R === null) weak = 'reverse';      // прямой знают — потихоньку вводим разворот
+  else if (R < N - 0.1) weak = 'reverse';
+  else if (N < R - 0.1) weak = 'normal';
+  if (!weak) return rnd() < 0.5 ? 'normal' : 'reverse';
+  return rnd() < 0.7 ? weak : (weak === 'reverse' ? 'normal' : 'reverse');
 }
 
 // ---------- Сессии ----------

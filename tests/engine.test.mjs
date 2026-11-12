@@ -125,6 +125,58 @@ t('длина 20 в speed', () => {
   assert.equal(q.length, 20);
 });
 
+console.log('Направление примера (4×6 vs 6×4):');
+function lcg(seed) { let s = seed; return () => (s = (s * 48271) % 2147483647) / 2147483647; }
+
+t('applyAnswer хранит признак разворота', () => {
+  const st = E.newItemState();
+  E.applyAnswer(st, true, 2, true);
+  E.applyAnswer(st, false, 3);
+  assert.equal(st.h[0].rev, 0, 'свежий ответ в начале истории');
+  assert.equal(st.h[1].rev, 1);
+});
+t('6×6 и степени — всегда прямой порядок', () => {
+  const st = E.newItemState();
+  for (let i = 0; i < 5; i++) E.applyAnswer(st, false, 9, true);
+  const double = E.buildItems('mul').find(i => i.id === 'mul:6:6');
+  const pow = E.buildItems('pow2').find(i => i.id === 'pow2:7');
+  assert.equal(E.pickOrientation(double, st, () => 0.1), 'normal');
+  assert.equal(E.pickOrientation(pow, st), 'normal');
+});
+t('нет данных — обе стороны равновероятны (~50%)', () => {
+  const item = E.buildItems('mul').find(i => i.id === 'mul:4:6');
+  const st = E.newItemState();
+  const rnd = lcg(42);
+  let rev = 0;
+  const n = 2000;
+  for (let i = 0; i < n; i++) if (E.pickOrientation(item, st, rnd) === 'reverse') rev++;
+  const ratio = rev / n;
+  assert.ok(Math.abs(ratio - 0.5) < 0.05, `ratio=${ratio}`);
+});
+t('разворот заведомо слабее — подаётся в 70% случаев', () => {
+  const item = E.buildItems('mul').find(i => i.id === 'mul:4:6');
+  const st = E.newItemState();
+  for (let i = 0; i < 4; i++) E.applyAnswer(st, true, 2);
+  for (let i = 0; i < 4; i++) E.applyAnswer(st, i < 1, 9, true);
+  const rnd = lcg(7);
+  let rev = 0;
+  const n = 2000;
+  for (let i = 0; i < n; i++) if (E.pickOrientation(item, st, rnd) === 'reverse') rev++;
+  const ratio = rev / n;
+  assert.ok(Math.abs(ratio - 0.7) < 0.06, `ratio=${ratio}`);
+});
+t('знания только в развороте — подтягиваем прямой (~35% разворота)', () => {
+  const item = E.buildItems('mul').find(i => i.id === 'mul:4:6');
+  const st = E.newItemState();
+  for (let i = 0; i < 4; i++) E.applyAnswer(st, true, 2, true);
+  const rnd = lcg(99);
+  let rev = 0;
+  const n = 2000;
+  for (let i = 0; i < n; i++) if (E.pickOrientation(item, st, rnd) === 'reverse') rev++;
+  const ratio = rev / n;
+  assert.ok(Math.abs(ratio - 0.35) < 0.06, `ratio=${ratio}`);
+});
+
 console.log('XP, уровни, стрик, бонусы:');
 t('answerXp: быстрый 15, обычный 10, ошибка 1', () => {
   assert.equal(E.answerXp(true, 3, 4), 15);
