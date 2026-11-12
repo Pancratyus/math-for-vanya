@@ -34,10 +34,10 @@ t('pow2: по умолчанию 1–20; с squaresMax — до N', () => {
   assert.equal(m100.length, 100);
   assert.equal(m100[99].answer, 10000);
 });
-t('pow3: 12 примеров, pow4: 5', () => {
-  assert.equal(E.buildItems('pow3').length, 12);
+t('pow3: 10 примеров (1–10), pow4: 5', () => {
+  assert.equal(E.buildItems('pow3').length, 10);
   assert.equal(E.buildItems('pow4').length, 5);
-  assert.equal(E.buildItems('pow3').find(i => i.n === 12).answer, 1728);
+  assert.equal(E.buildItems('pow3').find(i => i.n === 10).answer, 1000);
 });
 
 console.log('Освоенность и проблемные:');

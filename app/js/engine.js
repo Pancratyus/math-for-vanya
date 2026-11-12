@@ -28,7 +28,7 @@ export function buildItems(section, squaresMax = SQUARES_MAX_DEFAULT) {
         items.push({ id: `mul:${a}:${b}`, text: `${a} × ${b}`, answer: a * b, section, n: a * 10 + b });
   } else {
     const p = Number(section.slice(3)); // 2 | 3 | 4
-    const max = { 2: squaresMax, 3: 12, 4: 5 }[p];
+    const max = { 2: squaresMax, 3: 10, 4: 5 }[p];
     for (let n = 1; n <= max; n++)
       items.push({ id: `${section}:${n}`, text: `${n}${SUP[p]}`, answer: Math.pow(n, p), section, n });
   }
@@ -45,7 +45,7 @@ export const HOME_SECTIONS = [
 
 export const LEVELS = [
   { key: 'pow2', title: 'Степень два',   sub: 'от 1 до 20', size: 20 },
-  { key: 'pow3', title: 'Степень три',   sub: 'от 1 до 12', size: 12 },
+  { key: 'pow3', title: 'Степень три',   sub: 'от 1 до 10', size: 10 },
   { key: 'pow4', title: 'Степень четыре', sub: 'от 1 до 5',  size: 5 },
 ];
 
@@ -242,7 +242,7 @@ export const ACHIEVEMENTS = [
   { id: 'mul_half',      icon: '🧩', title: 'Половина таблицы', desc: '23 из 45 примеров освоены' },
   { id: 'mul_all',       icon: '👑', title: 'Таблица покорена', desc: 'Все 45 примеров освоены' },
   { id: 'sq_all',        icon: '⬜', title: 'Все квадраты',     desc: 'Все квадраты (по текущей настройке) освоены' },
-  { id: 'cubes_all',     icon: '🧊', title: 'Кубы покорены',    desc: 'Все 12 кубов освоены' },
+  { id: 'cubes_all',     icon: '🧊', title: 'Кубы покорены',    desc: `Все ${buildItems('pow3').length} кубов освоены` },
   { id: 'pow4_all',      icon: '⚡', title: 'Четвёртая степень', desc: 'Все степени 1–5 освоены' },
   { id: 'fast_15',       icon: '💨', title: 'Молния',           desc: '15 верных подряд быстрее порога за сессию' },
   { id: 'level_5',       icon: '🎓', title: 'Знаток',           desc: 'Достигни 5 уровня' },
@@ -270,7 +270,7 @@ export function checkAchievements(state, ctx = {}) {
     mul_half: mulGreen >= 23,
     mul_all: mulGreen >= 45,
     sq_all: sqGreen >= buildItems('pow2', squaresMax).length,
-    cubes_all: cubesGreen >= 12,
+    cubes_all: cubesGreen >= buildItems('pow3').length,
     pow4_all: pow4Green >= 5,
     fast_15: (ctx.fastStreak || 0) >= 15,
     level_5: lv >= 5,
