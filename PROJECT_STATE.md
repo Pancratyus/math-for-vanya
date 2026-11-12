@@ -99,6 +99,13 @@ PWA-приложение (веб-приложение, устанавливае�
        настройки, карта освоенности. Замечания исправлены.
 - [x] 11. README.md — установка на iPhone (2 пути: Wi-Fi с этого Mac, хостинг)
 - [x] 12. Финализация PROJECT_STATE.md
+- [x] 13. Экран «Правила игры» в приложении (v1.1, sw v3) + чек-лист синхронизации правил в README
+- [x] 14. Публикация: GitHub Pancratyus/math-for-vanya (публичный), GitHub Pages,
+       деплой через .github/workflows/deploy-pages.yml ( Actions: push в main → Pages )
+       Живой адрес: https://pancratyus.github.io/math-for-vanya/
+       Примечание: Pages включался вручную через
+       `gh api repos/.../pages -X POST -f build_type=workflow` (токен workflow
+       не может сам создать сайт — «Resource not accessible by integration»).
 
 ## 6. Текущий статус
 
@@ -133,7 +140,15 @@ python3 -m http.server 8123 -d app
 
 ## 7. Идеи на будущее (не подтверждены пользователем)
 
-- Хостинг на HTTPS (GitHub Pages / Netlify) для полного офлайна PWA
 - Режим деления (обратный к таблице умножения)
-- Синхронизация/экспорт статистики
+- Синхронизация/экспорт статистики (сейчас localStorage — на каждом устройстве свой)
 - Экран «таблица умножения целиком» для подглядывания (шпаргалка-режим)
+
+## 8. Публикация и платформы
+
+- Репозиторий: https://github.com/Pancratyus/math-for-vanya (публичный)
+- Сайт: https://pancratyus.github.io/math-for-vanya/ (HTTPS, полный офлайн)
+- Деплой: push в `main` → GitHub Actions → Pages. Локальный git-юзер: Pancratyus / pankratyus@gmail.com
+- **Android поддерживается**: Chrome → «Добавить на главный экран» /
+  «Установить приложение». Манифест и SW стандартные. Прогресс на каждом
+  устройстве свой (localStorage), синхронизации между iPhone и Android нет.
