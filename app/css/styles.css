@@ -504,6 +504,11 @@ button {
 .sum-streak { font-size: 17px; font-weight: 700; color: var(--orange); }
 .sum-streak.dead { color: var(--ink-2); }
 
+.sum-review { text-align: left; }
+.review-row { font-size: 13px; line-height: 1.5; background: var(--card); border-radius: 14px; box-shadow: var(--shadow); padding: 10px 14px; margin-top: 6px; color: var(--ink-2); }
+.review-row.bad { color: var(--red); }
+.review-row b { color: var(--ink); }
+
 .sum-ach { display: flex; flex-direction: column; gap: 8px; }
 .ach-chip {
   background: #fff8e2;

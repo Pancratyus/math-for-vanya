@@ -61,19 +61,30 @@ t('isProblem: 2 ошибки из последних 3', () => {
   E.applyAnswer(st, true, 2); E.applyAnswer(st, false, 3); E.applyAnswer(st, false, 3);
   assert.ok(E.isProblem(st, 4));
 });
-t('isProblem: верно, но медленно', () => {
+t('isProblem: одна ошибка уже делает проблемным (липкие пробелы)', () => {
   const st = E.newItemState();
-  E.applyAnswer(st, true, 6); E.applyAnswer(st, true, 7);
+  E.applyAnswer(st, true, 2); E.applyAnswer(st, true, 2); E.applyAnswer(st, false, 2);
   assert.ok(E.isProblem(st, 4));
+});
+t('isProblem: после ошибок остаётся пробелом, пока серия верных < 3', () => {
+  const st = E.newItemState();
+  E.applyAnswer(st, false, 3); E.applyAnswer(st, false, 3);
+  // сессия пробелов пройдена верно — но это только 1-й и 2-й верные подряд
+  E.applyAnswer(st, true, 2);
+  assert.ok(E.isProblem(st, 4), '1 верный подряд — ещё пробел');
+  E.applyAnswer(st, true, 2);
+  assert.ok(E.isProblem(st, 4), '2 верных подряд — ещё пробел');
+  E.applyAnswer(st, true, 2);
+  assert.ok(!E.isProblem(st, 4), '3 верных подряд — выведен из пробелов');
+});
+t('isProblem: медленный остаётся пробелом даже при серии верных', () => {
+  const st = E.newItemState();
+  for (let i = 0; i < 5; i++) E.applyAnswer(st, true, 7);
+  assert.ok(E.isProblem(st, 4), 'верно, но по 7 сек — всё ещё пробел');
 });
 t('isProblem: верно и быстро — не проблемный', () => {
   const st = E.newItemState();
   E.applyAnswer(st, true, 2); E.applyAnswer(st, true, 3);
-  assert.ok(!E.isProblem(st, 4));
-});
-t('isProblem: единственная ошибка не делает проблемным', () => {
-  const st = E.newItemState();
-  E.applyAnswer(st, true, 2); E.applyAnswer(st, true, 2); E.applyAnswer(st, false, 2);
   assert.ok(!E.isProblem(st, 4));
 });
 
@@ -115,6 +126,22 @@ t('gaps: только проблемные, длина ограничена', ()
   const q = E.buildSession(items, map, 'gaps', 20, 4);
   assert.equal(q.length, 7);
   for (const e of q) assert.ok(E.isProblem(map[e.id], 4));
+});
+t('gaps: примеры остаются в пуле после одного верного прохода (сцена из репорта)', () => {
+  const items = E.buildItems('mul');
+  const map = {};
+  // 6 проблемных примеров
+  items.forEach((it, i) => { if (i < 6) { const s = E.newItemState(); E.applyAnswer(s, false, 2); E.applyAnswer(s, false, 2); map[it.id] = s; } });
+  // первая сессия пробелов: все отвечены верно по одному разу
+  for (const it of items.slice(0, 6)) E.applyAnswer(map[it.id], true, 2);
+  const q = E.buildSession(items, map, 'gaps', 20, 4);
+  assert.equal(q.length, 6, 'после одного верного прохода пул не сжимается');
+  // вторая сессия — снова верно (2 верных подряд)
+  for (const it of items.slice(0, 6)) E.applyAnswer(map[it.id], true, 2);
+  assert.equal(E.buildSession(items, map, 'gaps', 20, 4).length, 6, '2 верных подряд — ещё в пробелах');
+  // третья сессия (3 верных подряд) — теперь выходят
+  for (const it of items.slice(0, 6)) E.applyAnswer(map[it.id], true, 2);
+  assert.equal(E.buildSession(items, map, 'gaps', 20, 4).length, 0, '3 верных подряд — выведены');
 });
 t('gaps: пустой пул → пустая сессия', () => {
   const q = E.buildSession(E.buildItems('mul'), {}, 'gaps', 20, 4);

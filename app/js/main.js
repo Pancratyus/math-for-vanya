@@ -94,6 +94,7 @@ function startSession(section, mode, lengthOpt) {
     fastStreak: 0, fastStreakBest: 0,
     flash: '', feedback: null, locked: false,
     confirmExit: false,
+    log: [], // {text, ok, t} — для списка «стоит повторить» на итогах
     // черновик: все ответы идут сюда и запишутся только при завершении сессии
     draft: JSON.parse(JSON.stringify(app.data)),
     newAchievements: [],
@@ -162,6 +163,7 @@ function submitAnswer() {
   s.xpEarned += xp;
   s.answered += 1;
   s.timeSum += t;
+  s.log.push({ text: s.current.text, answer: s.current.answer, ok, t });
 
   s.locked = true;
   stopTimer();

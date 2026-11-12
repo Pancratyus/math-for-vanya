@@ -6,6 +6,7 @@ export const SQUARES_MAX_DEFAULT = 20; // квадраты по умолчани
 export const MAX_REQUEUE = 2;       // макс. повторов ошибочного примера в сессии
 export const MIN_GAPS_POOL = 5;     // меньше проблемных — кнопка «Пробелы» неактивна
 export const EASY_MUL_WEIGHT = 0.3; // «умножение на 10» выпадает в ~3 раза реже
+export const GAP_EXIT_STREAK = 3;   // верных подряд, чтобы пример покинул «Пробелы»
 
 // ---------- Пулы примеров ----------
 
@@ -68,16 +69,29 @@ export function mastery(st, threshold = THRESHOLD_DEFAULT) {
   return s / sw;
 }
 
-/** Проблемный пример (для режима «Пробелы»): динамически, не хранится. */
+/** Сколько верных ответов подряд с начала истории (свежейшей стороны). */
+function leadingCorrect(h) {
+  let n = 0;
+  for (const r of h) { if (!r.o) break; n++; }
+  return n;
+}
+
+/**
+ * Проблемный пример (для режима «Пробелы»). Правила:
+ * 1) медленный, но верный — всё ещё пробел, пока не ускорится;
+ * 2) если в сохранённой истории была ошибка и серия верных подряд меньше
+ *    GAP_EXIT_STREAK — пример остаётся в пробелах: связи нужно несколько
+ *    повторений (как минимум трижды решить правильно).
+ */
 export function isProblem(st, threshold = THRESHOLD_DEFAULT) {
   if (!st || st.h.length === 0) return false;
   const last3 = st.h.slice(0, 3);
   const errors = last3.filter(r => !r.o).length;
-  if (errors >= 2) return true;
   if (errors === 0 && last3.length >= 2) {
     const avg = last3.reduce((s, r) => s + r.t, 0) / last3.length;
     if (avg > threshold) return true;
   }
+  if (st.h.some(r => !r.o) && leadingCorrect(st.h) < GAP_EXIT_STREAK) return true;
   return false;
 }
 

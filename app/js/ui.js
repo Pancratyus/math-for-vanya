@@ -235,6 +235,21 @@ export function sessionHtml(app) {
   </div>`;
 }
 
+/** «Стоит повторить»: ошибки и медленные примеры сессии — что именно учтено. */
+function reviewHtml(s) {
+  const th = app.data.settings.threshold;
+  const wrong = s.log.filter(r => !r.ok).map(r => `${r.text} = ${r.answer}`);
+  const slow = s.log.filter(r => r.ok && r.t > th).sort((a, b) => b.t - a.t).slice(0, 5)
+    .map(r => `${r.text} (${fmtSec(r.t)})`);
+  if (!wrong.length && !slow.length) return '';
+  return `
+    <div class="sum-review">
+      <div class="segment-label">Стоит повторить</div>
+      ${wrong.length ? `<div class="review-row bad">✗ ошибки: ${wrong.join(' · ')}</div>` : ''}
+      ${slow.length ? `<div class="review-row">🐢 медленно (ответ верный, но дольше ${th} с): ${slow.join(' · ')}</div>` : ''}
+    </div>`;
+}
+
 // ---------- Итоги сессии ----------
 
 export function summaryHtml(app) {
@@ -258,6 +273,7 @@ export function summaryHtml(app) {
       <small>${rankName(lv.level)}, уровень ${lv.level} · ${lv.rest}/${lv.need} до след.</small>
     </div>
     <div class="sum-streak ${alive ? '' : 'dead'}">${alive ? '🔥' : '🕑'} Стрик: ${app.data.streak.count} ${plural(app.data.streak.count, 'день,дня,дней')} ${alive ? 'подряд' : '— тренируйся сегодня!'}</div>
+    ${reviewHtml(s)}
     ${news.length ? `
       <div class="sum-ach">
         <div class="segment-label">Новые ачивки!</div>
@@ -447,7 +463,7 @@ export function rulesHtml(app) {
       <div class="card rule"><span class="rule-icon">🎯</span><p><b>Что делать.</b> Программа показывает пример — набери ответ цифрами и нажми <b>✓</b>. Кнопка <b>⌫</b> стирает лишнюю цифру.</p></div>
       <div class="card rule"><span class="rule-icon">↔️</span><p><b>Любой порядок.</b> Пример может прийти и как 4 × 6, и как 6 × 4 — это специально: учимся отвечать сразу, без «переворачивания». Слабая сторона будет приходить чаще, пока не подтянется.</p></div>
       <div class="card rule"><span class="rule-icon">⚡</span><p><b>Режим «Скорость».</b> Все примеры раздела — вперемешку. Тренируешь отвечать быстро и без ошибок.</p></div>
-      <div class="card rule"><span class="rule-icon">🧠</span><p><b>Режим «Пробелы».</b> Только те примеры, где трудно (2 ошибки из последних 3 или ответ дольше порога). Появится, когда наберётся хотя бы 5 таких.</p></div>
+      <div class="card rule"><span class="rule-icon">🧠</span><p><b>Режим «Пробелы».</b> Примеры, где были ошибки или медленные ответы. Пример выходит из пробелов, только когда ты решишь его верно <b>3 раза подряд</b> — одному правильному проходу связи в голове не нарабатываются.</p></div>
       <div class="card rule"><span class="rule-icon">⏱</span><p><b>Секундомер.</b> Время на ответ не ограничено — но быстрый верный ответ (не дольше <b>${th} сек</b>) приносит больше опыта.</p></div>
       <div class="card rule"><span class="rule-icon">🏁</span><p><b>Доведение.</b> В статистику и опыт попадает только сессия, доведённая до конца. Выйдешь раньше — ничего не запишется: просто посмотрел, что внутри, — и хорошо.</p></div>
       <div class="card rule"><span class="rule-icon">💡</span><p><b>Если ошибся.</b> Покажем правильный ответ, а этот пример ещё раз придёт в конце сессии — чтобы ты его запомнил.</p></div>
