@@ -61,6 +61,7 @@ export function homeHtml(app) {
         <span class="chev">›</span>
       </button>
     </nav>
+    <button class="rules-link" data-act="go-rules">📖 Правила игры</button>
   </div>`;
 }
 
@@ -357,6 +358,36 @@ function achHtml(app) {
       ${got ? `<span class="ach-date">✓ ${got.slice(5).replace('-', '.')}</span>` : ''}
     </div>`;
   }).join('') + `</div>`;
+}
+
+// ---------- Правила игры ----------
+// ВАЖНО ДЛЯ РАЗРАБОТЧИКОВ: при любом изменении механик приложения
+// синхронизируй этот экран с фактическим поведением (формулы и правила
+// описаны в PROJECT_STATE.md §4). Проверка — пункт чек-листа обновления в README.
+
+export function rulesHtml(app) {
+  const th = app.data.settings.threshold;
+  return `
+  <div class="screen">
+    <header class="bar">
+      <button class="back" data-act="go-home">‹</button>
+      <h1>Правила игры</h1><span class="bar-spacer"></span>
+    </header>
+    <div class="card-list rules">
+      <div class="card rule"><span class="rule-icon">🎯</span><p><b>Что делать.</b> Программа показывает пример — набери ответ цифрами и нажми <b>✓</b>. Кнопка <b>⌫</b> стирает лишнюю цифру.</p></div>
+      <div class="card rule"><span class="rule-icon">⚡</span><p><b>Режим «Скорость».</b> Все примеры раздела — вперемешку. Тренируешь отвечать быстро и без ошибок.</p></div>
+      <div class="card rule"><span class="rule-icon">🧠</span><p><b>Режим «Пробелы».</b> Только те примеры, где трудно (2 ошибки из последних 3 или ответ дольше порога). Появится, когда наберётся хотя бы 5 таких.</p></div>
+      <div class="card rule"><span class="rule-icon">⏱</span><p><b>Секундомер.</b> Время на ответ не ограничено — но быстрый верный ответ (не дольше <b>${th} сек</b>) приносит больше опыта.</p></div>
+      <div class="card rule"><span class="rule-icon">💡</span><p><b>Если ошибся.</b> Покажем правильный ответ, а этот пример ещё раз придёт в конце сессии — чтобы ты его запомнил.</p></div>
+      <div class="card rule"><span class="rule-icon">✨</span><p><b>Опыт (XP).</b> Верный ответ — 10, быстрый — 15, даже неверный — 1 за старание. За сессию с точностью 90% — бонус +30, а без единой ошибки — +75!</p></div>
+      <div class="card rule"><span class="rule-icon">🎓</span><p><b>Уровни и звания.</b> Новичок → Ученик → Знаток → Умник → Магистр → Профессор. Опыт растёт — растёт и звание.</p></div>
+      <div class="card rule"><span class="rule-icon">🔥</span><p><b>Стрик.</b> Тренируйся каждый день — счётчик дней подряд растёт. Пропустишь день — начнётся с единицы.</p></div>
+      <div class="card rule"><span class="rule-icon">🏅</span><p><b>Ачивки.</b> 16 медалей открываются сами: за первую сессию, за сотню ответов, за покорённую таблицу и другие.</p></div>
+      <div class="card rule"><span class="rule-icon">🗺️</span><p><b>Карта освоенности.</b> В статистике каждая клетка — пример: зелёный — освоено, жёлтый — почти, красный — трудно, серый — ещё не встречался.</p></div>
+      <div class="card rule parent"><span class="rule-icon">⚙️</span><p><small><b>Родителям:</b> порог «медленного» ответа (сейчас ${th} сек), звук и сброс прогресса — в настройках. Прогресс хранится на устройстве и не передаётся в интернет.</small></p></div>
+    </div>
+    <p class="hint-center">Главная тренировка — каждый день по чуть-чуть. Удачи! 🍀</p>
+  </div>`;
 }
 
 // ---------- Настройки ----------

@@ -8,7 +8,7 @@ import {
 import { loadState, saveState, resetState, itemState, dayEntry, defaultState } from './storage.js';
 import { soundCorrect, soundWrong, soundFinish } from './audio.js';
 import {
-  homeHtml, levelsHtml, modeHtml, sessionHtml, summaryHtml, statsHtml, settingsHtml, fmtSec,
+  homeHtml, levelsHtml, modeHtml, sessionHtml, summaryHtml, statsHtml, settingsHtml, rulesHtml, fmtSec,
 } from './ui.js';
 
 const app = {
@@ -32,6 +32,7 @@ function render() {
     summary: summaryHtml,
     stats: statsHtml,
     settings: settingsHtml,
+    rules: rulesHtml,
   }[app.screen](app);
   el.innerHTML = html;
   if (app.screen === 'session') startTimer();
@@ -232,6 +233,7 @@ document.addEventListener('click', (e) => {
   switch (act) {
     case 'go-home': go('home'); break;
     case 'go-settings': go('settings'); break;
+    case 'go-rules': go('rules'); break;
     case 'go-stats': go('stats', { tab: 'progress' }); break;
     case 'go-section':
       if (t.dataset.section === 'mul') go('mode', { section: 'mul', length: '20' });
