@@ -1,4 +1,7 @@
-/* main.js — навигация, сессия, события. Точка входа приложения. */
+/* main.js — навигация, сессия, события. Точка входа приложения.
+   Учёт результатов: ответы копятся в «черновик» сессии и записываются
+   только если сессия доведена до конца. Ранний выход — ничего не пишет
+   (ознакомительные заходы статистику не портят). */
 
 import {
   SECTIONS, buildItems, buildSession, applyAnswer,
@@ -72,20 +75,27 @@ function sectionLabel(section) {
 }
 
 function startSession(section, mode, lengthOpt) {
-  const items = buildItems(section);
+  const items = buildItems(section, app.data.settings.squaresMax);
   const length = lengthOpt === 'full' ? items.length : Math.min(20, items.length);
   const queue = buildSession(items, app.data.items, mode, length, app.data.settings.threshold);
-  if (queue.length === 0) { alert('Пока нет примеров для этого режима — потренируйся в «Скорости».'); return; }
+  if (queue.length === 0) {
+    app.params.notice = 'Пока нет примеров для этого режима — потренируйся в «Скорости».';
+    render();
+    return;
+  }
   app.session = {
     mode, section, lengthOpt,
     sectionLabel: sectionLabel(section),
     planned: queue.length, requeued: 0,
     queue, idx: 0,
     input: '', current: null,
-    startedAt: null, timerHandle: null,
+    questionStart: null, timerHandle: null,
     answered: 0, correct: 0, timeSum: 0, xpEarned: 0,
     fastStreak: 0, fastStreakBest: 0,
     flash: '', feedback: null, locked: false,
+    confirmExit: false,
+    // черновик: все ответы идут сюда и запишутся только при завершении сессии
+    draft: JSON.parse(JSON.stringify(app.data)),
     newAchievements: [],
     speedFull: mode === 'speed' && section === 'mul' && lengthOpt === 'full',
   };
@@ -99,7 +109,7 @@ function nextQuestion(first = false) {
   if (!s) return;
   if (s.idx >= s.queue.length) { finishSession(); return; }
   const entry = s.queue[s.idx];
-  const item = buildItems(s.section).find(it => it.id === entry.id);
+  const item = buildItems(s.section, s.draft.settings.squaresMax).find(it => it.id === entry.id);
   s.current = item;
   s.input = '';
   s.flash = '';
@@ -111,12 +121,11 @@ function nextQuestion(first = false) {
 
 function onKey(k) {
   const s = app.session;
-  if (!s || s.locked) return;
+  if (!s || s.locked || s.confirmExit) return;
   if (k === 'back') { s.input = s.input.slice(0, -1); render(); return; }
   if (k === 'enter') { if (s.input !== '') submitAnswer(); return; }
   if (/^\d$/.test(k)) {
     if (s.input.length >= 6) return;
-    // не даём начинать ответ с нуля-числа: "0" сам по себе бессмысленный
     if (s.input === '0') s.input = '';
     s.input += k;
     render();
@@ -125,24 +134,23 @@ function onKey(k) {
 
 function submitAnswer() {
   const s = app.session;
-  const th = app.data.settings.threshold;
+  const d = s.draft; // черновик состояния — станет основным только при завершении
+  const th = d.settings.threshold;
   const t = (Date.now() - s.questionStart) / 1000;
   const ok = parseInt(s.input, 10) === s.current.answer;
   const today = todayKey();
 
-  // состояние примера
-  const st = itemState(app.data, s.current.id);
+  const st = itemState(d, s.current.id);
   applyAnswer(st, ok, t);
 
-  // дневная и общая статистика, XP — сразу, чтобы ничего не терялось
-  const day = dayEntry(app.data, today);
+  const day = dayEntry(d, today);
   day.a += 1;
   const xp = answerXp(ok, t, th);
   if (ok) day.c += 1;
   day.xp += xp;
-  app.data.totals.a += 1;
-  if (ok) app.data.totals.c += 1;
-  app.data.xp += xp;
+  d.totals.a += 1;
+  if (ok) d.totals.c += 1;
+  d.xp += xp;
   s.xpEarned += xp;
   s.answered += 1;
   s.timeSum += t;
@@ -156,21 +164,19 @@ function submitAnswer() {
     s.fastStreakBest = Math.max(s.fastStreakBest, s.fastStreak);
     s.flash = 'ok';
     s.feedback = s.input;
-    if (app.data.settings.sound) soundCorrect();
-    saveState(app.data);
+    if (d.settings.sound) soundCorrect();
     render();
     setTimeout(() => advance(), 600);
   } else {
     s.fastStreak = 0;
     s.flash = 'bad';
     s.feedback = String(s.current.answer);
-    if (app.data.settings.sound) soundWrong();
+    if (d.settings.sound) soundWrong();
     const entry = s.queue[s.idx];
     if (entry.tries < MAX_REQUEUE) {
       s.queue.push({ id: entry.id, tries: entry.tries + 1 });
       s.requeued += 1;
     }
-    saveState(app.data);
     render();
     setTimeout(() => advance(), 1500);
   }
@@ -187,39 +193,47 @@ function finishSession() {
   const s = app.session;
   stopTimer();
   const today = todayKey();
+  const d = s.draft;
 
   // бонус и стрик — только за доведённую до конца сессию
   const bonus = sessionBonus(s.answered, s.correct);
-  app.data.xp += bonus;
+  d.xp += bonus;
   s.xpEarned += bonus;
-  app.data.streak = updateStreak(app.data.streak, today);
-  const day = dayEntry(app.data, today);
+  d.streak = updateStreak(d.streak, today);
+  const day = dayEntry(d, today);
   day.s += 1;
   day.xp += bonus;
-  app.data.totals.sessions += 1;
+  d.totals.sessions += 1;
 
-  s.newAchievements = checkAchievements(app.data, {
+  s.newAchievements = checkAchievements(d, {
     perfect10: s.answered >= 10 && s.correct === s.answered,
     fastStreak: s.fastStreakBest,
     speedFull: s.speedFull && s.answered === s.planned && s.correct / s.answered >= 0.9,
   });
+
+  app.data = d; // черновик становится основным состоянием — целиком
   saveState(app.data);
   if (app.data.settings.sound) soundFinish();
   app.screen = 'summary';
   render();
 }
 
-function exitSession() {
-  if (!app.session) return;
+// ---------- Выход из сессии ----------
+
+function requestExit() {
   const s = app.session;
-  const mid = s.answered > 0 && s.idx < s.queue.length;
-  const msg = mid
-    ? 'Выйти из сессии? Ответы уже сохранены, но бонусы и стрик за сессию не начислятся.'
-    : 'Выйти из сессии?';
-  if (!confirm(msg)) return;
+  if (!s) return;
+  if (s.answered === 0 || s.idx >= s.queue.length) { doExit(); return; } // отвечать не начали — считать нечего
+  s.confirmExit = true; // показываем внутреннюю модалку (нативные confirm() в standalone-PWA ненадёжны)
+  render();
+}
+
+function doExit() {
+  const s = app.session;
+  if (!s) return;
   stopTimer();
-  const keep = { mode: s.mode, section: s.section, lengthOpt: s.lengthOpt };
-  app.session = null;
+  const keep = { section: s.section, lengthOpt: s.lengthOpt };
+  app.session = null; // черновик выбрасывается — ничего не записано
   go('mode', { section: keep.section, length: keep.lengthOpt });
 }
 
@@ -247,6 +261,7 @@ document.addEventListener('click', (e) => {
       break;
     case 'set-length':
       app.params.length = t.dataset.length;
+      delete app.params.notice;
       render();
       break;
     case 'start-session':
@@ -254,7 +269,11 @@ document.addEventListener('click', (e) => {
       break;
     case 'noop': break;
     case 'key': onKey(t.dataset.key); break;
-    case 'exit-session': exitSession(); break;
+    case 'exit-session': requestExit(); break;
+    case 'exit-yes': doExit(); break;
+    case 'exit-no':
+      if (app.session) { app.session.confirmExit = false; render(); }
+      break;
     case 'restart-session': {
       const s = app.session;
       if (s) startSession(s.section, s.mode, s.lengthOpt);
@@ -279,11 +298,17 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// слайдер порога
+// слайдеры настроек
 document.addEventListener('input', (e) => {
   if (e.target.matches('#th-slider')) {
     app.data.settings.threshold = Number(e.target.value);
     const label = document.getElementById('th-val');
+    if (label) label.textContent = e.target.value;
+    saveState(app.data);
+  }
+  if (e.target.matches('#sq-slider')) {
+    app.data.settings.squaresMax = Number(e.target.value);
+    const label = document.getElementById('sq-val');
     if (label) label.textContent = e.target.value;
     saveState(app.data);
   }
@@ -296,8 +321,8 @@ function showMasteryDetail(id) {
   if (!out) return;
   const th = app.data.settings.threshold;
   const st = app.data.items[id];
-  const [sec, a, b] = id.split(':');
-  const item = buildItems(sec).find(it => it.id === id);
+  const [sec] = id.split(':');
+  const item = buildItems(sec, app.data.settings.squaresMax).find(it => it.id === id);
   if (!item) return;
   const m = mastery(st, th);
   let text;
@@ -314,7 +339,7 @@ function showMasteryDetail(id) {
 
 render();
 
-// снимаем свайп-назад Safari внутри PWA (история не используется)
+// офлайн-кэш
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => { /* офлайн недоступен — не критично */ });
 }

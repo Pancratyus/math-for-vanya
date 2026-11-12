@@ -4,7 +4,7 @@
 import {
   SECTIONS, LEVELS, ACHIEVEMENTS, HOME_SECTIONS,
   buildItems, mastery, isProblem, levelFromXp, rankName,
-  greenCells, streakAlive, poolSize,
+  greenCells, streakAlive,
 } from './engine.js';
 import { MIN_GAPS_POOL } from './engine.js';
 
@@ -70,6 +70,7 @@ export function homeHtml(app) {
 export function levelsHtml(app) {
   const st = app.data;
   const th = st.settings.threshold;
+  const sqMax = st.settings.squaresMax;
   return `
   <div class="screen">
     <header class="bar">
@@ -78,12 +79,13 @@ export function levelsHtml(app) {
     </header>
     <div class="card-list">
       ${LEVELS.map(l => {
-        const items = buildItems(l.key);
+        const items = buildItems(l.key, sqMax);
+        const sub = l.key === 'pow2' ? `от 1 до ${sqMax}` : l.sub;
         const gaps = items.filter(it => isProblem(st.items[it.id], th)).length;
         return `
         <button class="big-btn" data-act="go-level" data-section="${l.key}">
           <span class="big-btn-icon">${l.key === 'pow2' ? '²' : l.key === 'pow3' ? '³' : '⁴'}</span>
-          <span class="big-btn-text"><b>${l.title}</b><small>${l.sub} · освоено ${greenCells(st, l.key, th)} из ${l.size}</small></span>
+          <span class="big-btn-text"><b>${l.title}</b><small>${sub} · освоено ${greenCells(st, l.key, th, sqMax)} из ${items.length}</small></span>
           <span class="chev">›</span>
         </button>`;
       }).join('')}
@@ -98,19 +100,19 @@ export function modeHtml(app) {
   const { section, length } = app.params;
   const st = app.data;
   const th = st.settings.threshold;
-  const items = buildItems(section);
+  const items = buildItems(section, st.settings.squaresMax);
   const gaps = items.filter(it => isProblem(st.items[it.id], th));
   const gapsOk = gaps.length >= MIN_GAPS_POOL;
   const size = items.length;
-  const fullLabel = section === 'mul' ? `Весь набор (${size})` : `Весь набор (${size})`;
   const lenFull = length === 'full';
   const title = SECTIONS[section] ? SECTIONS[section].name : section;
   return `
   <div class="screen">
     <header class="bar">
-      <button class="back" data-act="back-from-mode">${section === 'mul' ? '‹' : '‹'}</button>
+      <button class="back" data-act="back-from-mode">‹</button>
       <h1>${esc(title)}</h1><span class="bar-spacer"></span>
     </header>
+    ${app.params.notice ? `<div class="notice">${esc(app.params.notice)}</div>` : ''}
     <div class="card-list">
       <button class="mode-card speed" data-act="start-session" data-mode="speed" data-length="${lenFull ? 'full' : '20'}">
         <span class="mode-icon">⚡</span>
@@ -125,7 +127,7 @@ export function modeHtml(app) {
       <div class="segment-label">Длина сессии</div>
       <div class="segment">
         <button class="${lenFull ? '' : 'on'}" data-act="set-length" data-length="20">20 вопросов</button>
-        <button class="${lenFull ? 'on' : ''}" data-act="set-length" data-length="full">${fullLabel}</button>
+        <button class="${lenFull ? 'on' : ''}" data-act="set-length" data-length="full">Весь набор (${size})</button>
       </div>
     </div>
     <p class="hint-center">Тренируйся каждый день — стрик 🔥 растёт!</p>
@@ -143,7 +145,7 @@ export function sessionHtml(app) {
   return `
   <div class="screen screen-session">
     <header class="sess-head">
-      <button class="exit" data-act="exit-session">✕</button>
+      <button class="back" data-act="exit-session" aria-label="Выйти из сессии">‹</button>
       <div class="sess-mid">
         <span class="chip mode-${s.mode}">${s.mode === 'gaps' ? '🧠 Пробелы' : '⚡ Скорость'}</span>
         <span class="chip">${s.sectionLabel}</span>
@@ -155,7 +157,13 @@ export function sessionHtml(app) {
       <div class="q-meta"><span class="q-timer" id="qtimer">0,0 с</span></div>
       <div class="answer-box ${s.flash || ''}">
         ${s.feedback
-          ? `<span class="fb ${s.flash}">${s.flash === 'ok' ? '✓' : '✗'} ${esc(s.feedback)}</span>`
+          ? (s.flash === 'ok'
+            ? `<span class="fb ok">✓ ${esc(s.feedback)}</span>`
+            : `<div class="fb-stack">
+                 <span class="fb bad">✗</span>
+                 <div class="fb-detail">Правильно: <b>${esc(s.feedback)}</b></div>
+                 ${s.input !== s.feedback ? `<div class="fb-input">ты набрал: ${esc(s.input)}</div>` : ''}
+               </div>`)
           : `<span class="typed ${empty ? 'empty' : ''}">${empty ? '?' : esc(s.input)}</span><span class="caret"></span>`}
       </div>
     </div>
@@ -165,6 +173,17 @@ export function sessionHtml(app) {
       <button class="key" data-act="key" data-key="0">0</button>
       <button class="key enter" data-act="key" data-key="enter">✓</button>
     </div>
+    ${s.confirmExit ? `
+    <div class="modal">
+      <div class="modal-card">
+        <b>Выйти из сессии?</b>
+        <p>Она не пройдена до конца — ответы не сохранятся и в статистику не попадут.</p>
+        <div class="confirm-row">
+          <button class="secondary" data-act="exit-no">Остаться</button>
+          <button class="danger-solid" data-act="exit-yes">Выйти</button>
+        </div>
+      </div>
+    </div>` : ''}
   </div>`;
 }
 
@@ -225,6 +244,7 @@ export function statsHtml(app) {
 function progressHtml(app) {
   const st = app.data;
   const th = st.settings.threshold;
+  const sqMax = st.settings.squaresMax;
   const days = lastNDays(7);
   const maxAcc = 100;
   const bars = days.map(dk => {
@@ -259,7 +279,7 @@ function progressHtml(app) {
   // проблемные
   const problems = [];
   for (const sec of ['mul', 'pow2', 'pow3', 'pow4']) {
-    for (const it of buildItems(sec)) {
+    for (const it of buildItems(sec, sqMax)) {
       const s = st.items[it.id];
       if (isProblem(s, th)) {
         problems.push({ it, s, m: mastery(s, th), errs: s.h.slice(0, 3).filter(r => !r.o).length });
@@ -310,14 +330,16 @@ function mapHtml(app) {
   const tab = app.params.mapTab || 'mul';
   const st = app.data;
   const th = st.settings.threshold;
+  const sqMax = st.settings.squaresMax;
   const tabs = [['mul', '×'], ['pow2', '²'], ['pow3', '³'], ['pow4', '⁴']]
     .map(([k, l]) => `<button class="${tab === k ? 'on' : ''}" data-act="map-tab" data-tab="${k}">${l}</button>`).join('');
-  const items = buildItems(tab);
-  const green = greenCells(st, tab, th);
+  const items = buildItems(tab, sqMax);
+  const green = greenCells(st, tab, th, sqMax);
   let grid;
   if (tab === 'pow2') {
-    // 100 клеток — сетка 10×10 без подписей, подробности по нажатию
-    grid = `<div class="mgrid" style="--cols:10">` +
+    // сетка квадратов: колонки подбираются под размер пула (20 → 5, 100 → 10)
+    const cols = Math.ceil(Math.sqrt(items.length));
+    grid = `<div class="mgrid" style="--cols:${cols}">` +
       items.map(it => {
         const m = mastery(st.items[it.id], th);
         return `<button class="mcell ${mcls(m)}" data-act="mastery-tap" data-id="${it.id}"></button>`;
@@ -378,13 +400,14 @@ export function rulesHtml(app) {
       <div class="card rule"><span class="rule-icon">⚡</span><p><b>Режим «Скорость».</b> Все примеры раздела — вперемешку. Тренируешь отвечать быстро и без ошибок.</p></div>
       <div class="card rule"><span class="rule-icon">🧠</span><p><b>Режим «Пробелы».</b> Только те примеры, где трудно (2 ошибки из последних 3 или ответ дольше порога). Появится, когда наберётся хотя бы 5 таких.</p></div>
       <div class="card rule"><span class="rule-icon">⏱</span><p><b>Секундомер.</b> Время на ответ не ограничено — но быстрый верный ответ (не дольше <b>${th} сек</b>) приносит больше опыта.</p></div>
+      <div class="card rule"><span class="rule-icon">🏁</span><p><b>Доведение.</b> В статистику и опыт попадает только сессия, доведённая до конца. Выйдешь раньше — ничего не запишется: просто посмотрел, что внутри, — и хорошо.</p></div>
       <div class="card rule"><span class="rule-icon">💡</span><p><b>Если ошибся.</b> Покажем правильный ответ, а этот пример ещё раз придёт в конце сессии — чтобы ты его запомнил.</p></div>
       <div class="card rule"><span class="rule-icon">✨</span><p><b>Опыт (XP).</b> Верный ответ — 10, быстрый — 15, даже неверный — 1 за старание. За сессию с точностью 90% — бонус +30, а без единой ошибки — +75!</p></div>
       <div class="card rule"><span class="rule-icon">🎓</span><p><b>Уровни и звания.</b> Новичок → Ученик → Знаток → Умник → Магистр → Профессор. Опыт растёт — растёт и звание.</p></div>
       <div class="card rule"><span class="rule-icon">🔥</span><p><b>Стрик.</b> Тренируйся каждый день — счётчик дней подряд растёт. Пропустишь день — начнётся с единицы.</p></div>
       <div class="card rule"><span class="rule-icon">🏅</span><p><b>Ачивки.</b> 16 медалей открываются сами: за первую сессию, за сотню ответов, за покорённую таблицу и другие.</p></div>
       <div class="card rule"><span class="rule-icon">🗺️</span><p><b>Карта освоенности.</b> В статистике каждая клетка — пример: зелёный — освоено, жёлтый — почти, красный — трудно, серый — ещё не встречался.</p></div>
-      <div class="card rule parent"><span class="rule-icon">⚙️</span><p><small><b>Родителям:</b> порог «медленного» ответа (сейчас ${th} сек), звук и сброс прогресса — в настройках. Прогресс хранится на устройстве и не передаётся в интернет.</small></p></div>
+      <div class="card rule parent"><span class="rule-icon">⚙️</span><p><small><b>Родителям:</b> порог «медленного» ответа (сейчас ${th} сек), диапазон квадратов (сейчас до ${app.data.settings.squaresMax}), звук и сброс прогресса — в настройках. Прогресс хранится на устройстве и не передаётся в интернет.</small></p></div>
     </div>
     <p class="hint-center">Главная тренировка — каждый день по чуть-чуть. Удачи! 🍀</p>
   </div>`;
@@ -401,6 +424,11 @@ export function settingsHtml(app) {
       <h1>Настройки</h1><span class="bar-spacer"></span>
     </header>
     <div class="card-list">
+      <div class="card">
+        <div class="segment-label">Квадраты: до числа <b id="sq-val">${st.settings.squaresMax}</b></div>
+        <input type="range" id="sq-slider" min="10" max="100" step="1" value="${st.settings.squaresMax}" data-act="squares">
+        <p class="hint">Квадраты чисел от 1 до этого числа. По умолчанию 20 — «режим новичка». Подними до 30 и выше, когда станет легко. Применится к новым сессиям.</p>
+      </div>
       <div class="card">
         <div class="segment-label">Порог «медленного» ответа: <b id="th-val">${st.settings.threshold}</b> сек</div>
         <input type="range" id="th-slider" min="2" max="12" step="1" value="${st.settings.threshold}" data-act="threshold">

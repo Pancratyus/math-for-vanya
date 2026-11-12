@@ -1,13 +1,13 @@
 /* storage.js — состояние приложения в localStorage телефона. */
 
-import { newItemState, THRESHOLD_DEFAULT } from './engine.js';
+import { newItemState, THRESHOLD_DEFAULT, SQUARES_MAX_DEFAULT } from './engine.js';
 
 const KEY = 'mv_state_v1';
 
 export function defaultState() {
   return {
     version: 1,
-    settings: { threshold: THRESHOLD_DEFAULT, sound: true },
+    settings: { threshold: THRESHOLD_DEFAULT, squaresMax: SQUARES_MAX_DEFAULT, sound: true },
     xp: 0,
     streak: { count: 0, lastDay: null },
     items: {},   // id -> {h:[{o,t}], a, c}

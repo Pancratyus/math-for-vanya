@@ -24,11 +24,15 @@ t('mul: 45 примеров, ответы верные', () => {
     assert.ok(a <= b, 'пары нормализованы a<=b');
   }
 });
-t('pow2: 100 примеров 1..100', () => {
-  const items = E.buildItems('pow2');
-  assert.equal(items.length, 100);
-  assert.equal(items[0].answer, 1);
-  assert.equal(items[99].answer, 10000);
+t('pow2: по умолчанию 1–20; с squaresMax — до N', () => {
+  assert.equal(E.buildItems('pow2').length, 20);
+  assert.equal(E.buildItems('pow2').at(-1).answer, 400);
+  const m30 = E.buildItems('pow2', 30);
+  assert.equal(m30.length, 30);
+  assert.equal(m30.find(i => i.n === 30).answer, 900);
+  const m100 = E.buildItems('pow2', 100);
+  assert.equal(m100.length, 100);
+  assert.equal(m100[99].answer, 10000);
 });
 t('pow3: 12 примеров, pow4: 5', () => {
   assert.equal(E.buildItems('pow3').length, 12);
@@ -81,10 +85,28 @@ t('speed: без повторов, покрыл весь пул на full', () =
   const ids = new Set(q.map(x => x.id));
   assert.equal(ids.size, 45);
 });
-t('speed: порядок случаен (seeded shuffle перемешивает)', () => {
+t('speed: порядок случаен', () => {
   const items = E.buildItems('mul');
   const q = E.buildSession(items, {}, 'speed', 45, 4);
   assert.notDeepEqual(q.map(x => x.id), items.map(i => i.id));
+});
+t('speed: ×10 выпадает реже (взвешенная выборка)', () => {
+  const items = E.buildItems('mul');
+  let easy = 0;
+  const runs = 200;
+  for (let i = 0; i < runs; i++) {
+    const q = E.buildSession(items, {}, 'speed', 20, 4);
+    easy += q.filter(e => /:10$/.test(e.id)).length;
+  }
+  const avg = easy / runs;
+  assert.ok(avg < 2.5, `среднее ×10 в сессии = ${avg} (равномерно было бы ~4)`);
+});
+t('speed: уникальность вопросов внутри сессии', () => {
+  const items = E.buildItems('mul');
+  for (let i = 0; i < 20; i++) {
+    const q = E.buildSession(items, {}, 'speed', 20, 4);
+    assert.equal(new Set(q.map(x => x.id)).size, q.length);
+  }
 });
 t('gaps: только проблемные, длина ограничена', () => {
   const items = E.buildItems('mul');
@@ -145,7 +167,7 @@ t('first_session открывается после сессии', () => {
   assert.ok(state.ach.first_session);
 });
 t('mul_all требует все 45 зелёных', () => {
-  const state = { version: 1, settings: { threshold: 4 }, xp: 0, streak: { count: 0, lastDay: null }, items: {}, days: {}, ach: {}, totals: { a: 0, c: 0, sessions: 0 } };
+  const state = { version: 1, settings: { threshold: 4, squaresMax: 20 }, xp: 0, streak: { count: 0, lastDay: null }, items: {}, days: {}, ach: {}, totals: { a: 0, c: 0, sessions: 0 } };
   for (const it of E.buildItems('mul')) {
     const s = E.newItemState();
     for (let i = 0; i < 5; i++) E.applyAnswer(s, true, 2);
@@ -155,6 +177,27 @@ t('mul_all требует все 45 зелёных', () => {
   assert.ok(news.includes('mul_all'));
   assert.ok(news.includes('mul_half'));
 });
+t('sq_all учитывает настройку squaresMax (по умолчанию 20)', () => {
+  const state = { version: 1, settings: { threshold: 4, squaresMax: 20 }, xp: 0, streak: { count: 0, lastDay: null }, items: {}, days: {}, ach: {}, totals: { a: 0, c: 0, sessions: 0 } };
+  for (const it of E.buildItems('pow2', 20)) {
+    const s = E.newItemState();
+    for (let i = 0; i < 5; i++) E.applyAnswer(s, true, 2);
+    state.items[it.id] = s;
+  }
+  const news = E.checkAchievements(state, {});
+  assert.ok(news.includes('sq_all'), '20 зелёных из 20 при squaresMax=20');
+});
+t('sq_all не открывается, если освоены не все из настройки', () => {
+  const state = { version: 1, settings: { threshold: 4, squaresMax: 20 }, xp: 0, streak: { count: 0, lastDay: null }, items: {}, days: {}, ach: {}, totals: { a: 0, c: 0, sessions: 0 } };
+  const items = E.buildItems('pow2', 20);
+  for (const it of items.slice(0, 19)) {
+    const s = E.newItemState();
+    for (let i = 0; i < 5; i++) E.applyAnswer(s, true, 2);
+    state.items[it.id] = s;
+  }
+  const news = E.checkAchievements(state, {});
+  assert.ok(!news.includes('sq_all'), '19 из 20 — не хватает');
+});
 t('fast_15 по контексту сессии', () => {
   const state = { version: 1, settings: { threshold: 4 }, xp: 0, streak: { count: 0, lastDay: null }, items: {}, days: {}, ach: {}, totals: { a: 0, c: 0, sessions: 0 } };
   const news = E.checkAchievements(state, { fastStreak: 15 });
@@ -162,10 +205,11 @@ t('fast_15 по контексту сессии', () => {
 });
 
 console.log('Миграция хранилища:');
-t('migrate досыпает недостающие поля', async () => {
+t('migrate досыпает недостающие поля, включая squaresMax', async () => {
   const { migrate } = await import('../app/js/storage.js');
   const st = migrate({ version: 1, xp: 50 });
   assert.equal(st.settings.threshold, 4);
+  assert.equal(st.settings.squaresMax, 20);
   assert.equal(st.settings.sound, true);
   assert.deepEqual(st.totals, { a: 0, c: 0, sessions: 0 });
   assert.equal(st.xp, 50);

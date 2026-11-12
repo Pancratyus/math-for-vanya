@@ -2,8 +2,10 @@
    Без DOM: работает и в браузере, и в Node (tests). */
 
 export const THRESHOLD_DEFAULT = 4; // сек: дольше — ответ считается «медленным»
+export const SQUARES_MAX_DEFAULT = 20; // квадраты по умолчанию 1–20 (настраивается)
 export const MAX_REQUEUE = 2;       // макс. повторов ошибочного примера в сессии
 export const MIN_GAPS_POOL = 5;     // меньше проблемных — кнопка «Пробелы» неактивна
+export const EASY_MUL_WEIGHT = 0.3; // «умножение на 10» выпадает в ~3 раза реже
 
 // ---------- Пулы примеров ----------
 
@@ -17,7 +19,7 @@ export const SECTIONS = {
 const SUP = { 2: '²', 3: '³', 4: '⁴' };
 
 /** Все примеры раздела: [{id, text, answer, section, n}] */
-export function buildItems(section) {
+export function buildItems(section, squaresMax = SQUARES_MAX_DEFAULT) {
   const items = [];
   if (section === 'mul') {
     for (let a = 2; a <= 10; a++)
@@ -25,7 +27,7 @@ export function buildItems(section) {
         items.push({ id: `mul:${a}:${b}`, text: `${a} × ${b}`, answer: a * b, section, n: a * 10 + b });
   } else {
     const p = Number(section.slice(3)); // 2 | 3 | 4
-    const max = { 2: 100, 3: 12, 4: 5 }[p];
+    const max = { 2: squaresMax, 3: 12, 4: 5 }[p];
     for (let n = 1; n <= max; n++)
       items.push({ id: `${section}:${n}`, text: `${n}${SUP[p]}`, answer: Math.pow(n, p), section, n });
   }
@@ -87,15 +89,24 @@ export function applyAnswer(st, ok, time) {
 
 // ---------- Сессии ----------
 
+/** Вес примера при выборке в «Скорость»: умножение на 10 — слишком лёгкое, реже. */
+function itemWeight(it) {
+  return it.section === 'mul' && /:10$/.test(it.id) ? EASY_MUL_WEIGHT : 1;
+}
+
 /** Очередь вопросов: [{id, tries}] */
-export function buildSession(items, stateMap, mode, length, threshold = THRESHOLD_DEFAULT) {
+export function buildSession(items, stateMap, mode, length, threshold = THRESHOLD_DEFAULT, rnd = Math.random) {
   let pool;
   if (mode === 'gaps') {
     pool = items.filter(it => isProblem(stateMap[it.id], threshold));
+    shuffle(pool, rnd);
   } else {
-    pool = items.slice();
+    // взвешенное перемешивание (экспоненциальные часы): больший вес — раньше выпадает
+    pool = items
+      .map(it => ({ it, key: -Math.log(Math.max(rnd(), 1e-9)) / itemWeight(it) }))
+      .sort((a, b) => a.key - b.key)
+      .map(x => x.it);
   }
-  shuffle(pool);
   return pool.slice(0, Math.min(length, pool.length)).map(it => ({ id: it.id, tries: 0 }));
 }
 
@@ -167,8 +178,8 @@ export function streakAlive(streak, today) {
 
 // ---------- Ачивки ----------
 
-export function greenCells(state, section, threshold) {
-  const items = buildItems(section);
+export function greenCells(state, section, threshold, squaresMax = SQUARES_MAX_DEFAULT) {
+  const items = buildItems(section, squaresMax);
   return items.filter(it => mastery(state.items[it.id], threshold) >= 0.8).length;
 }
 
@@ -182,7 +193,7 @@ export const ACHIEVEMENTS = [
   { id: 'streak_30',     icon: '🏆', title: 'Месяц дисциплины', desc: 'Стрик 30 дней' },
   { id: 'mul_half',      icon: '🧩', title: 'Половина таблицы', desc: '23 из 45 примеров освоены' },
   { id: 'mul_all',       icon: '👑', title: 'Таблица покорена', desc: 'Все 45 примеров освоены' },
-  { id: 'sq_all',        icon: '⬜', title: 'Все квадраты',     desc: '100 квадратов освоены' },
+  { id: 'sq_all',        icon: '⬜', title: 'Все квадраты',     desc: 'Все квадраты (по текущей настройке) освоены' },
   { id: 'cubes_all',     icon: '🧊', title: 'Кубы покорены',    desc: 'Все 12 кубов освоены' },
   { id: 'pow4_all',      icon: '⚡', title: 'Четвёртая степень', desc: 'Все степени 1–5 освоены' },
   { id: 'fast_15',       icon: '💨', title: 'Молния',           desc: '15 верных подряд быстрее порога за сессию' },
@@ -194,10 +205,10 @@ export const ACHIEVEMENTS = [
 /** Проверить все ачивки, открыть новые. Возвращает список новых id. */
 export function checkAchievements(state, ctx = {}) {
   const threshold = state.settings.threshold;
+  const squaresMax = state.settings.squaresMax || SQUARES_MAX_DEFAULT;
   const lv = levelFromXp(state.xp).level;
-  const m = id => mastery(state.items[id], threshold);
   const mulGreen = greenCells(state, 'mul', threshold);
-  const sqGreen = greenCells(state, 'pow2', threshold);
+  const sqGreen = greenCells(state, 'pow2', threshold, squaresMax);
   const cubesGreen = greenCells(state, 'pow3', threshold);
   const pow4Green = greenCells(state, 'pow4', threshold);
   const cond = {
@@ -210,7 +221,7 @@ export function checkAchievements(state, ctx = {}) {
     streak_30: state.streak.count >= 30,
     mul_half: mulGreen >= 23,
     mul_all: mulGreen >= 45,
-    sq_all: sqGreen >= 100,
+    sq_all: sqGreen >= buildItems('pow2', squaresMax).length,
     cubes_all: cubesGreen >= 12,
     pow4_all: pow4Green >= 5,
     fast_15: (ctx.fastStreak || 0) >= 15,

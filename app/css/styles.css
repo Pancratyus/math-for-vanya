@@ -280,15 +280,6 @@ button {
   gap: 10px;
 }
 
-.exit {
-  width: 40px; height: 40px;
-  border-radius: 12px;
-  background: var(--card);
-  box-shadow: var(--shadow);
-  font-size: 18px;
-  color: var(--ink-2);
-}
-
 .sess-mid { flex: 1; display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
 
 .chip {
@@ -365,6 +356,12 @@ button {
 .fb { font-size: 40px; font-weight: 800; }
 .fb.ok { color: #1d9d4b; }
 .fb.bad { color: var(--red); }
+
+.fb-stack { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.fb-detail { font-size: 20px; font-weight: 600; color: var(--ink); }
+.fb-detail b { color: #1d9d4b; font-size: 24px; }
+.fb-input { font-size: 14px; color: var(--ink-2); }
+.fb-input b { color: var(--red); }
 
 /* ---------- Клавиатура ---------- */
 
@@ -642,6 +639,41 @@ input[type="range"] {
 .toggle.on i { left: 27px; }
 
 .danger { color: var(--red); font-weight: 600; font-size: 16px; }
+
+.notice {
+  background: #fff8e2;
+  border-radius: 14px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: #8a6d1a;
+  margin-bottom: 12px;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 32, 51, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 50;
+}
+
+.modal-card {
+  background: #fff;
+  border-radius: 22px;
+  padding: 20px;
+  max-width: 340px;
+  box-shadow: 0 12px 40px rgba(28, 32, 51, .25);
+  font-size: 15px;
+  line-height: 1.45;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.modal-card b { font-size: 17px; }
+.modal-card p { color: var(--ink-2); }
 
 .confirm p { font-size: 14px; line-height: 1.4; color: var(--ink); }
 .confirm-row { display: flex; gap: 10px; margin-top: 12px; }
