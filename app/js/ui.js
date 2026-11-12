@@ -2,7 +2,7 @@
    Обработчики — в main.js, через делегирование data-act. */
 
 import {
-  SECTIONS, LEVELS, ACHIEVEMENTS, HOME_SECTIONS,
+  SECTIONS, LEVELS, ACHIEVEMENTS, HOME_SECTIONS, RANKS,
   buildItems, mastery, isProblem, levelFromXp, rankName,
   greenCells, streakAlive,
 } from './engine.js';
@@ -31,23 +31,25 @@ export function homeHtml(app) {
   const lv = levelFromXp(st.xp);
   const alive = streakAlive(st.streak, dayKey(new Date()));
   const flame = alive ? '🔥' : '🕑';
+  const open = !!app.params.heroOpen;
   return `
   <div class="screen screen-home">
     <header class="home-head">
       <div class="app-title">Математика<br>для Вани</div>
       <button class="gear" data-act="go-settings" aria-label="Настройки">⚙️</button>
     </header>
-    <div class="hero-card">
+    <button class="hero-card" data-act="hero-toggle">
       <div class="hero-row">
         <div class="hero-level">
           <span class="level-badge">${lv.level}</span>
-          <span class="rank">${rankName(lv.level)}</span>
+          <span class="rank">${rankName(lv.level)} <i class="chev-down">${open ? '▴' : '▾'}</i></span>
         </div>
         <div class="streak ${alive ? '' : 'dead'}" title="Дни тренировок подряд">${flame} ${st.streak.count}</div>
       </div>
       <div class="xp-bar"><div class="xp-fill" style="width:${pct(lv.rest / lv.need)}%"></div></div>
-      <div class="xp-note">${lv.rest} / ${lv.need} XP до уровня ${lv.level + 1}</div>
-    </div>
+      <div class="xp-note">${lv.rest} / ${lv.need} XP до уровня ${lv.level + 1} · всего ${st.xp} XP · сессий: ${st.totals.sessions}</div>
+      ${open ? heroDetails(app, lv) : ''}
+    </button>
     <nav class="home-nav">
       ${HOME_SECTIONS.map(s => `
         <button class="big-btn" data-act="go-section" data-section="${s.key}">
@@ -62,6 +64,47 @@ export function homeHtml(app) {
       </button>
     </nav>
     <button class="rules-link" data-act="go-rules">📖 Правила игры</button>
+    ${cheatTableHtml()}
+  </div>`;
+}
+
+/** Раскрытая плашка: что значат XP, уровни и звания */
+function heroDetails(app, lv) {
+  const st = app.data;
+  const th = st.settings.threshold;
+  const ladder = RANKS.map(([start, name]) => {
+    const cur = rankName(lv.level) === name;
+    return `<span class="rank-step ${cur ? 'cur' : ''}">${start}·${name}</span>`;
+  }).join('');
+  return `
+    <div class="hero-details">
+      <div class="hd-row"><span>Верный ответ</span><b>+10 XP</b></div>
+      <div class="hd-row"><span>Быстрый (до ${th} сек)</span><b>+15 XP</b></div>
+      <div class="hd-row"><span>Неверный</span><b>+1 XP</b></div>
+      <div class="hd-row"><span>Сессия: точность 90%+</span><b>+30 XP</b></div>
+      <div class="hd-row"><span>Сессия: всё верно</span><b>+75 XP</b></div>
+      <div class="hd-row"><span>Всего ответов</span><b>${st.totals.a}</b></div>
+      <div class="hd-ladder">${ladder}</div>
+      <p class="hd-note">Число на плашке — сколько XP осталось до следующего уровня. 6 сессий по 20 быстрых ответов — это уже ~1800 XP, так что твой прогресс настоящий. Доведённая сессия каждый день растит стрик 🔥.</p>
+    </div>`;
+}
+
+/** Таблица Пифагора — шпаргалка на главном экране */
+function cheatTableHtml() {
+  let head = '<span class="cheat-h"></span>';
+  for (let b = 2; b <= 10; b++) head += `<span class="cheat-h">${b}</span>`;
+  let rows = '';
+  for (let a = 2; a <= 10; a++) {
+    rows += `<span class="cheat-h">${a}</span>`;
+    for (let b = 2; b <= 10; b++) {
+      rows += `<span class="cheat-c ${a === b ? 'diag' : ''}">${a * b}</span>`;
+    }
+  }
+  return `
+  <div class="cheat">
+    <div class="segment-label">Таблица умножения — шпаргалка</div>
+    <div class="cheat-grid" style="--cols:10">${head}${rows}</div>
+    <div class="cheat-note">клетка = строка × столбец</div>
   </div>`;
 }
 
@@ -105,6 +148,7 @@ export function modeHtml(app) {
   const gapsOk = gaps.length >= MIN_GAPS_POOL;
   const size = items.length;
   const lenFull = length === 'full';
+  const perSession = Math.min(20, size);
   const title = SECTIONS[section] ? SECTIONS[section].name : section;
   return `
   <div class="screen">
@@ -116,11 +160,15 @@ export function modeHtml(app) {
     <div class="card-list">
       <button class="mode-card speed" data-act="start-session" data-mode="speed" data-length="${lenFull ? 'full' : '20'}">
         <span class="mode-icon">⚡</span>
-        <span class="mode-text"><b>Скорость</b><small>все ${size} примеров вперемешку, нарабатываем автоматизм</small></span>
+        <span class="mode-text"><b>Скорость</b><small>${lenFull
+          ? `все ${size} ${plural(size, 'пример,примера,примеров')} вперемешку, нарабатываем автоматизм`
+          : `${perSession} случайных ${plural(perSession, 'пример,примера,примеров')} из всех ${size} — нарабатываем автоматизм`}</small></span>
       </button>
       <button class="mode-card gaps ${gapsOk ? '' : 'disabled'}" data-act="${gapsOk ? 'start-session' : 'noop'}" data-mode="gaps" data-length="${lenFull ? 'full' : '20'}">
         <span class="mode-icon">🧠</span>
-        <span class="mode-text"><b>Пробелы (${gaps.length})</b><small>${gapsOk ? 'только те примеры, где трудно' : `нужно хотя бы ${MIN_GAPS_POOL} проблемных — потренируйся в «Скорости»`}</small></span>
+        <span class="mode-text"><b>Пробелы · ${gaps.length}</b><small>${gapsOk
+          ? `${gaps.length} ${plural(gaps.length, 'пример,примера,примеров')}, где были ошибки или медленные ответы`
+          : `трудных примеров пока ${gaps.length} из ${MIN_GAPS_POOL} нужных — потренируйся в «Скорости»`}</small></span>
       </button>
     </div>
     <div class="segment-block">
@@ -425,9 +473,9 @@ export function settingsHtml(app) {
     </header>
     <div class="card-list">
       <div class="card">
-        <div class="segment-label">Квадраты: до числа <b id="sq-val">${st.settings.squaresMax}</b></div>
+        <div class="segment-label">Степень два: до числа <b id="sq-val">${st.settings.squaresMax}</b></div>
         <input type="range" id="sq-slider" min="10" max="100" step="1" value="${st.settings.squaresMax}" data-act="squares">
-        <p class="hint">Квадраты чисел от 1 до этого числа. По умолчанию 20 — «режим новичка». Подними до 30 и выше, когда станет легко. Применится к новым сессиям.</p>
+        <p class="hint">Возводим в квадрат числа от 1 до этого числа. По умолчанию 20 — «режим новичка». Подними до 30 и выше, когда станет легко. Применится к новым сессиям.</p>
       </div>
       <div class="card">
         <div class="segment-label">Порог «медленного» ответа: <b id="th-val">${st.settings.threshold}</b> сек</div>

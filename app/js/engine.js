@@ -11,9 +11,9 @@ export const EASY_MUL_WEIGHT = 0.3; // «умножение на 10» выпад
 
 export const SECTIONS = {
   mul:  { name: 'Таблица умножения', icon: '×' },
-  pow2: { name: 'Квадраты',          icon: 'x²', hint: '1–100' },
-  pow3: { name: 'Кубы',              icon: 'x³', hint: '1–12' },
-  pow4: { name: 'Четвёртые степени', icon: 'x⁴', hint: '1–5' },
+  pow2: { name: 'Степень два',       icon: 'x²' },
+  pow3: { name: 'Степень три',       icon: 'x³' },
+  pow4: { name: 'Степень четыре',    icon: 'x⁴' },
 };
 
 const SUP = { 2: '²', 3: '³', 4: '⁴' };
@@ -36,17 +36,20 @@ export function buildItems(section, squaresMax = SQUARES_MAX_DEFAULT) {
 
 export function poolSize(section) { return buildItems(section).length; }
 
-/** Разделы для карт освоенности по строкам главного пути */
+/** Разделы на главном экране */
 export const HOME_SECTIONS = [
   { key: 'mul',  title: 'Таблица умножения', sub: 'от 2×2 до 10×10' },
-  { key: 'pow2', title: 'Квадраты',          sub: 'числа от 1 до 100' },
+  { key: 'pow2', title: 'Степени',           sub: 'степени два, три и четыре' },
 ];
 
 export const LEVELS = [
-  { key: 'pow2', title: 'Квадраты',  sub: 'от 1 до 100',   size: 100 },
-  { key: 'pow3', title: 'Кубы',      sub: 'от 1 до 12',    size: 12 },
-  { key: 'pow4', title: 'Степень 4', sub: 'от 1 до 5',     size: 5 },
+  { key: 'pow2', title: 'Степень два',   sub: 'от 1 до 20', size: 20 },
+  { key: 'pow3', title: 'Степень три',   sub: 'от 1 до 12', size: 12 },
+  { key: 'pow4', title: 'Степень четыре', sub: 'от 1 до 5',  size: 5 },
 ];
+
+/** Лестница званий: [уровень, звание] */
+export const RANKS = [[1, 'Новичок'], [3, 'Ученик'], [5, 'Знаток'], [7, 'Умник'], [9, 'Магистр'], [12, 'Профессор']];
 
 // ---------- Состояние примера ----------
 
@@ -141,7 +144,6 @@ export function levelFromXp(xp) {
   return { level, rest, need: xpForNextLevel(level) };
 }
 
-const RANKS = [[1, 'Новичок'], [3, 'Ученик'], [5, 'Знаток'], [7, 'Умник'], [9, 'Магистр'], [12, 'Профессор']];
 export function rankName(level) {
   let name = RANKS[0][1];
   for (const [lv, nm] of RANKS) if (level >= lv) name = nm;

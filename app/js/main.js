@@ -248,6 +248,9 @@ document.addEventListener('click', (e) => {
     case 'go-home': go('home'); break;
     case 'go-settings': go('settings'); break;
     case 'go-rules': go('rules'); break;
+    case 'hero-toggle':
+      if (app.screen === 'home') { app.params.heroOpen = !app.params.heroOpen; render(); }
+      break;
     case 'go-stats': go('stats', { tab: 'progress' }); break;
     case 'go-section':
       if (t.dataset.section === 'mul') go('mode', { section: 'mul', length: '20' });
